@@ -2,9 +2,11 @@
 
 (push :sdl2 *features*)
 
-(uiop:define-package #:sdl2-ffi (:use))
-(uiop:define-package #:sdl2-ffi.accessors (:use))
-(uiop:define-package #:sdl2-ffi.functions
+(setf cffi-sys:*cffi-ecl-method* :c/c++)
+
+(defpackage #:sdl2-ffi (:use))
+(defpackage #:sdl2-ffi.accessors (:use))
+(defpackage #:sdl2-ffi.functions
   (:use)
   (:export #:sdl-quit))
 
@@ -14,8 +16,7 @@
         #:autowrap.minimal
         #:plus-c
         #:sdl2-ffi.accessors
-        #:sdl2-ffi.functions
-        #:trivial-channels)
+        #:sdl2-ffi.functions)
   (:import-from
    #:cffi
    #:mem-ref
@@ -32,10 +33,10 @@
    #:quit*
    #:was-init
    #:with-init
+   #:with-init*
    #:in-main-thread
    #:version
    #:version-wrapped
-   #:make-this-thread-main
 
    ;; hints.lisp
    #:get-hint
@@ -415,5 +416,4 @@
   (:use #:cl
         #:alexandria
         #:cffi)
-  (:export #:basic-test
-           #:renderer-test))
+  (:export #:renderer-test))

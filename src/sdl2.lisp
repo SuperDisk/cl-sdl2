@@ -73,32 +73,6 @@ into CL's boolean type system."
            (error 'sdl-error :string (sdl-get-error))
            ,v))))
 
-(defvar *the-main-thread* nil)
-(defvar *main-thread-channel* nil)
-(defvar *main-thread* nil)
-(defvar *lisp-message-event* nil)
-(defvar *wakeup-event* nil)
-
-(defmacro in-main-thread ((&key background no-event) &body b)
-  (with-gensyms (fun channel)
-    `(let ((,fun (lambda () ,@b)))
-       (if (or *main-thread-channel* *main-thread*)
-           (if *main-thread*
-               (funcall ,fun)
-               ,(if background
-                    `(progn
-                       (sendmsg *main-thread-channel* (cons ,fun nil))
-                       (values))
-                    `(let ((,channel (make-channel)))
-                       (sendmsg *main-thread-channel* (cons ,fun ,channel))
-                       ,(unless no-event
-                          '(push-event *wakeup-event*))
-                       (let ((result (recvmsg ,channel)))
-                         (etypecase result
-                           (list (values-list result))
-                           (error (error result)))))))
-           (error "No main thread, did you call SDL_Init?")))))
-
 (defun handle-message (msg)
   (let ((fun (car msg))
         (chan (cdr msg))
@@ -118,41 +92,12 @@ into CL's boolean type system."
             (sendmsg chan (multiple-value-list (funcall fun)))
             (funcall fun))))))
 
-(defun recv-and-handle-message ()
-  (let ((msg (recvmsg *main-thread-channel*)))
-    (handle-message msg)))
-
-(defun get-and-handle-messages ()
-  (loop :as msg = (and *main-thread-channel*
-                       (getmsg *main-thread-channel*))
-        :while msg :do
-          (handle-message msg)))
-
 (defmacro without-fp-traps (&body body)
   #+sbcl
   `(sb-int:with-float-traps-masked (:underflow :overflow :inexact :invalid :divide-by-zero)
      ,@body)
   #-sbcl
   `(progn ,@body))
-
-(defun sdl-main-thread ()
-  (without-fp-traps
-    (let ((*main-thread* (bt:current-thread)))
-      (loop :while *main-thread-channel* :do
-        (block loop-block
-          (restart-bind ((continue (lambda (&optional v)
-                                     (declare (ignore v))
-                                     (signal 'sdl-continue))
-                                   :report-function
-                                   (lambda (stream)
-                                     (format stream "Return to the SDL2 main loop.")))
-                         (abort (lambda (&optional v)
-                                  (declare (ignore v))
-                                  (signal 'sdl-quit))
-                                :report-function
-                                (lambda (stream)
-                                  (format stream "Abort, quitting SDL2 entirely."))))
-            (recv-and-handle-message)))))))
 
 (defun ensure-main-channel ()
   (unless *main-thread-channel*
@@ -175,68 +120,16 @@ thread."
     (sendmsg *main-thread-channel* (cons function nil)))
   (sdl-main-thread))
 
-(defun init (&rest sdl-init-flags)
-  "Initialize SDL2 with the specified subsystems. Initializes everything by default."
-  (unless *wakeup-event*
-    (setf *wakeup-event* (alloc 'sdl2-ffi:sdl-event)))
-  (unless *main-thread-channel*
-    (ensure-main-channel)
-
-    ;; If we did not have a main-thread channel, make a default main thread.
-    #-(and (or sbcl ccl) darwin)
-    (setf *the-main-thread* (bt:make-thread #'sdl-main-thread :name "SDL2 Main Thread"))
-
-    ;; On OSX, we need to run in the main thread; some implementations allow us to safely
-    ;; do this. On other platforms (mainly GLX?), we just need to run in a dedicated thread.
-    #+(and ccl darwin)
-    (let ((thread (find 0 (ccl:all-processes) :key #'ccl:process-serial-number)))
-      (setf *the-main-thread* thread)
-      (ccl:process-interrupt thread #'sdl-main-thread)))
-    #+(and sbcl darwin)
-    (let ((thread (sb-thread:main-thread)))
-      (setf *the-main-thread* thread)
-      (when (not (eq thread (bt:current-thread)))
-        (sb-thread:interrupt-thread thread #'sdl-main-thread)))
-
-  (in-main-thread (:no-event t)
-    ;; HACK! glutInit on OSX uses some magic undocumented API to correctly make the calling thread
-    ;; the primary thread. This allows cl-sdl2 to actually work. Nothing else seemed to work at all
-    ;; to be honest.
-    #+(and ccl darwin)
-    (cl-glut:init)
-    (let ((init-flags (autowrap:mask-apply 'sdl-init-flags sdl-init-flags)))
-      (check-rc (sdl-init init-flags))
-      (unless *lisp-message-event*
-        (setf *lisp-message-event* (sdl-register-events 1)
-              (c-ref *wakeup-event* sdl2-ffi:sdl-event :type) *lisp-message-event*)))))
-
 (defun init* (flags)
   "Low-level function to initialize SDL2 with the supplied subsystems. Useful
    when not using cl-sdl2's threading mechanisms."
-  (sdl-init (autowrap:mask-apply 'sdl-init-flags flags)))
+  #+nil(sdl-init (autowrap:mask-apply 'sdl-init-flags flags)))
 
 (defun was-init (&rest flags)
   (/= 0 (sdl-was-init (autowrap:mask-apply 'sdl-init-flags flags))))
 
 (defun quit ()
-  "Shuts down SDL2."
-  (in-main-thread (:background t)
-    (let ((mtc *main-thread-channel*))
-      (sdl-quit)
-      (setf *main-thread-channel* nil)
-      (setf *lisp-message-event* nil)
-      (when mtc (sendmsg mtc nil))))
-  #-(and sbcl darwin)
-  (when (and *the-main-thread*
-             (not (eq *the-main-thread* (bt:current-thread))))
-    (handler-case
-        (bt:join-thread *the-main-thread*)
-      (error (e)
-        (declare (ignore e))
-        (setf *main-thread-channel* nil)))
-    (setf *the-main-thread* nil))
-  (when *the-main-thread*
-    (setf *the-main-thread* nil)))
+  "Shuts down SDL2.")
 
 (defun quit* ()
   "Low-level function to quit SDL2. Useful when not using cl-sdl2's
@@ -248,6 +141,14 @@ thread."
      (init ,@sdl-init-flags)
      (unwind-protect
           (in-main-thread () ,@body)
+       (quit))))
+
+(defmacro with-init* ((&rest sdl-init-flags) &body body)
+  `(progn
+     (init* (list ,@sdl-init-flags))
+     ,@body
+     (unwind-protect
+          (progn ,@body)
        (quit))))
 
 (defun niy (message)

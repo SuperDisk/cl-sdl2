@@ -3,10 +3,7 @@
 (defvar *user-event-types* (make-hash-table))
 (defvar *user-event-codes* (make-hash-table))
 (defvar *user-events* (make-hash-table))
-(defvar *user-event-id*
-  (c-let ((new-atomic sdl2-ffi:sdl-atomic-t))
-    (setf (new-atomic :value) 0)
-    new-atomic))
+(defvar *user-event-id* nil)
 (defvar *event-loop* nil)
 
 (defun new-event (&optional (event-type :firstevent))
@@ -60,8 +57,6 @@
     (cond
       (is-user-event
        user-event-code)
-      ((eq :lisp-message event-type)
-       *lisp-message-event*)
       (t
        (enum-value 'sdl2-ffi:sdl-event-type event-type)))))
 
@@ -71,8 +66,6 @@
       (cond
         (is-user-event
          user-event-type)
-        ((eq (event :type) *lisp-message-event*)
-         :lisp-message)
         (t
          (or (enum-key 'sdl2-ffi:sdl-event-type (event :type))
              (event :type)))))))
@@ -200,7 +193,7 @@ Stores the optional user-data in sdl2::*user-events*"
         (rc (gensym "RC-")))
     `(when (or ,recursive (not *event-loop*))
        (setf *event-loop* t)
-       (in-main-thread (:background ,background)
+       (progn ;in-main-thread (:background ,background)
          (let ((,quit nil)
                (,idle-func nil))
            (unwind-protect

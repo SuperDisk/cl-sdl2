@@ -6,7 +6,6 @@
                :cl-autowrap
                :cl-plus-c
                :cl-ppcre
-               :trivial-channels
                :trivial-features
                #+darwin :cl-glut)
   :pathname "src"
@@ -62,8 +61,7 @@
   :description "Simple examples to demonstrate common usage of SDL2."
   :author "Chip Collier <photex@lofidelitygames.com>"
   :license "MIT"
-  :depends-on (:sdl2 :cl-opengl)
+  :depends-on (:sdl2)
   :pathname "examples"
   :serial t
-  :components ((:file "basic")
-               (:file "renderer")))
+  :components ((:file "renderer")))

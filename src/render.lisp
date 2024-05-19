@@ -6,17 +6,6 @@
   "Return an uninitialized SDL_RendererInfo structure."
   (autowrap:alloc 'sdl2-ffi:sdl-renderer-info))
 
-(defmethod print-object ((rinfo sdl2-ffi:sdl-renderer-info) stream)
-  (c-let ((rinfo sdl2-ffi:sdl-renderer-info :from rinfo))
-    (print-unreadable-object (rinfo stream :type t :identity t)
-      (format stream "name ~S flags ~A num-texture-formats ~A texture-formats TBD max-texture-width ~
-~A max-texture-height ~A"
-              (rinfo :name)
-              (rinfo :flags)
-              (rinfo :num-texture-formats)
-              (rinfo :max-texture-width)
-              (rinfo :max-texture-height)))))
-
 (defun free-render-info (rinfo)
   "Specifically free the SDL_RendererInfo structure."
   (foreign-free (ptr rinfo))
@@ -122,9 +111,9 @@ at subpixel precision."
 (defun get-render-draw-color (renderer)
   "Use this function to get the current color used by renderer for drawing operations"
   (c-with ((r sdl2-ffi:uint8)
-	   (g sdl2-ffi:uint8)
-	   (b sdl2-ffi:uint8)
-	   (a sdl2-ffi:uint8))
+     (g sdl2-ffi:uint8)
+     (b sdl2-ffi:uint8)
+     (a sdl2-ffi:uint8))
     (check-rc (sdl2-ffi.functions:sdl-get-render-draw-color renderer (r &) (g &) (b &) (a &)))
     (values r g b a)))
 
@@ -198,20 +187,6 @@ precision."
 (defun render-present (renderer)
   "Use this function to update the screen with rendering performed."
   (sdl2-ffi.functions:sdl-render-present renderer))
-
-(defun get-renderer-info (renderer)
-  "Allocate a new SDL_RendererInfo structure, fill it in with information
-about the specified renderer, and return it."
-  (let ((rinfo (make-renderer-info)))
-    (check-rc (sdl-get-renderer-info renderer rinfo))
-    rinfo))
-
-(defun get-renderer-max-texture-size (renderer)
-  (c-let ((info sdl2-ffi:sdl-renderer-info :from (get-renderer-info renderer)))
-    (unwind-protect
-         (values (info :max-texture-width)
-                 (info :max-texture-height))
-      (free-render-info info))))
 
 ;; TODO SDL_GetRendererOutputSize
 (defun get-renderer-output-size (renderer)

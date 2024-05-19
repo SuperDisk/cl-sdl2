@@ -20,11 +20,6 @@
          (c-points (,@(cdr wrappers)) ,@body))
       `(progn ,@body)))
 
-(defmethod print-object ((point sdl2-ffi:sdl-point) stream)
-  (c-point (point)
-    (print-unreadable-object (point stream :type t :identity t)
-      (format stream "x ~A y ~A" (point :x) (point :y)))))
-
 (defun copy-point (point)
   "Allocate and return a new SDL_Point and make its slots be equal to the passed in SDL_Point."
   (c-point (point)
@@ -49,11 +44,11 @@ dest-point."
     ((symbolp binding)
      `(let ((,binding (make-point 0 0)))
         (unwind-protect (progn ,@body)
-	  (free-point ,binding))))
+    (free-point ,binding))))
     ((= (length binding) 3)
      `(let ((,(first binding) (make-point ,@(cdr binding))))
-	(unwind-protect (progn ,@body)
-	  (free-point ,(first binding)))))
+  (unwind-protect (progn ,@body)
+    (free-point ,(first binding)))))
     (t
      (error "with-point: Must have a binding of either a symbol or a symbol and 2 forms which are ~
 x y of a point"))))
@@ -109,11 +104,6 @@ to (make-point 0 0).
 (define-struct-accessors (rect sdl2-ffi:sdl-rect)
   :x :y (width :w) (height :h))
 
-(defmethod print-object ((rect sdl2-ffi:sdl-rect) stream)
-  (c-rect (rect)
-    (print-unreadable-object (rect stream :type t :identity t)
-      (format stream "x ~A y ~A w ~A h ~A" (rect :x) (rect :y) (rect :w) (rect :h)))))
-
 (defun copy-rect (rect)
   "Allocate and return a new SDL_Rect and make its slots be equal to the passed in SDL_Rect."
   (c-rect (rect)
@@ -146,11 +136,11 @@ dest-rect."
     ((symbolp binding)
      `(let ((,binding (make-rect 0 0 0 0)))
         (unwind-protect (progn ,@body)
-	  (free-rect ,binding))))
+    (free-rect ,binding))))
     ((= (length binding) 5)
      `(let ((,(first binding) (make-rect ,@(cdr binding))))
         (unwind-protect (progn ,@body)
-	  (free-rect ,(first binding)))))
+    (free-rect ,(first binding)))))
     (t
      (error "with-rect: Must have a binding of either a symbol or a symbol and 4 forms which are ~
 x y w h of a rectangle"))))
@@ -274,11 +264,6 @@ rectangle as a newly allocated SDL_Rect in which all others fit perfectly."
 
 (define-struct-accessors (f-rect sdl2-ffi:sdl-f-rect)
   :x :y (width :w) (height :h))
-
-(defmethod print-object ((f-rect sdl2-ffi:sdl-f-rect) stream)
-  (c-f-rect (f-rect)
-    (print-unreadable-object (f-rect stream :type t :identity t)
-      (format stream "x ~A y ~A w ~A h ~A" (f-rect :x) (f-rect :y) (f-rect :w) (f-rect :h)))))
 
 (defun copy-f-rect (f-rect)
   "Allocate and return a new SDL_FRect and make its slots be equal to the passed in SDL_FRect."
